@@ -1,0 +1,472 @@
+HADOOP 安裝多主機(cluster)模式，首先建議你要有4台電腦以上，才會好工作。
+
+(0) 把 OS 安裝好
+此範例為 CentOS Linux 7
+namenode 使用 server with GUI 的安裝選項
+datanode 使用 @base @core @development 的選項
+/home 目錄獨立一個分割區或硬碟，給 datanode or namenode 使用。
+
+(1) 把所有主機的 dns name 及 hostname 設定好
+[hadoop@namenode ~]$ host namenode
+namenode.jangmt.com has address 192.168.1.100
+[hadoop@namenode ~]$ host datanode1
+datanode1.jangmt.com has address 192.168.1.1
+[hadoop@namenode ~]$ host datanode2
+datanode2.jangmt.com has address 192.168.1.2
+[hadoop@namenode ~]$ host datanode3
+datanode3.jangmt.com has address 192.168.1.3
+
+為了方便識別主機，建議將主機的名稱修改為設定的名稱
+修改方式可以透過 hostnamectl 指令修改。
+可以參考 http://blog.jangmt.com/2015/06/centos7-rhel7-runlevel.html 
+(在 CENTOS 7 的版本可以使用 hostnamectl 來改變系統 hostname)
+
+(2)先達成每台主機可以 ssh key 認證
+可以參考
+http://blog.jangmt.com/2015/09/ssh-key-linux.html
+基本上建議建立一個 hadoop 帳號，這個使用者為主要放置程式的使用者，同時也是 HDFS 的管理員。
+然後 hadoop 可以登入 root ， root 可以登入 hadoop 都無須密碼，這樣交換資料也相較容易。
+
+[hadoop@namenode ~]$ ssh root@datanode1 ifconfig enp2s0
+enp2s0: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1500
+        inet 192.168.1.1  netmask 255.255.255.0  broadcast 192.168.1.255
+        inet6 fe80::922b:34ff:fe24:e0c6  prefixlen 64  scopeid 0x20<link>
+        ether 90:2b:34:24:e0:c6  txqueuelen 1000  (Ethernet)
+        RX packets 897188  bytes 1331862037 (1.2 GiB)
+        RX errors 0  dropped 1  overruns 0  frame 0
+        TX packets 191894  bytes 14979844 (14.2 MiB)
+        TX errors 0  dropped 0 overruns 0  carrier 1  collisions 0
+
+[hadoop@namenode ~]$ ssh hadoop@datanode1 /sbin/ifconfig enp2s0
+enp2s0: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1500
+        inet 192.168.1.1  netmask 255.255.255.0  broadcast 192.168.1.255
+        inet6 fe80::922b:34ff:fe24:e0c6  prefixlen 64  scopeid 0x20<link>
+        ether 90:2b:34:24:e0:c6  txqueuelen 1000  (Ethernet)
+        RX packets 897238  bytes 1331869640 (1.2 GiB)
+        RX errors 0  dropped 1  overruns 0  frame 0
+        TX packets 191949  bytes 14988692 (14.2 MiB)
+        TX errors 0  dropped 0 overruns 0  carrier 1  collisions 0
+		
+[hadoop@namenode ~]$ ssh root@datanode1
+Last login: Mon Sep 28 00:58:31 2015 from namenode.jangmt.com
+[root@datanode1 ~]# ssh hadoop@localhost
+The authenticity of host 'localhost (::1)' can't be established.
+ECDSA key fingerprint is 15:e4:e7:62:cc:59:71:7d:2d:54:7d:6a:ba:9a:6f:10.
+Are you sure you want to continue connecting (yes/no)? yes
+Warning: Permanently added 'localhost' (ECDSA) to the list of known hosts.
+Last login: Mon Sep 28 00:58:21 2015 from namenode.jangmt.com
+
+並建議在使用前都登入一次，讓  known_hosts 擁有所有主機的 key 。
+做好後每一台主機的 hadoop 及 root 目錄 .ssh 類似如下：
+[hadoop@namenode ~]$ ls .ssh/ -l
+total 16
+-rw-r--r--. 1 hadoop hadoop  391 Sep 24 17:20 authorized_keys
+-rw-------. 1 hadoop hadoop 1675 Sep 24 17:20 id_rsa
+-rw-r--r--. 1 hadoop hadoop  391 Sep 24 17:20 id_rsa.pub
+-rw-r--r--. 1 hadoop hadoop 1943 Sep 28 00:06 known_hosts
+
+
+(3)先安裝 oracle java
+可以參考這一篇：
+http://blog.jangmt.com/2015/09/oracle-java-centos-linux-7.html 
+僅留下 oracle 版本的 java ，移除 openjdk 檔案
+
+[hadoop@namenode ~]$ rpm -qa | grep openjdk
+[hadoop@namenode ~]$ java -version
+java version "1.8.0_51"
+Java(TM) SE Runtime Environment (build 1.8.0_51-b16)
+Java HotSpot(TM) 64-Bit Server VM (build 25.51-b03, mixed mode)
+
+環境變數可於後面在一起設定好
+[hadoop@namenode ~]$ env | grep JAVA
+JAVA_HOME=/usr/java/latest
+
+(4) 下載 hadoop 安裝檔及文件內容參考
+hadoop 官方文件網站 2.7.1 版本
+http://hadoop.apache.org/docs/r2.7.1/
+單主機的安裝說明
+http://hadoop.apache.org/docs/r2.7.1/hadoop-project-dist/hadoop-common/SingleCluster.html
+叢集主機的安裝說明，這篇教學文件以這篇修改而來
+http://hadoop.apache.org/docs/r2.7.1/hadoop-project-dist/hadoop-common/ClusterSetup.html
+命令詳解
+http://hadoop.apache.org/docs/r2.7.1/hadoop-project-dist/hadoop-common/CommandsManual.html
+hdfs shell
+http://hadoop.apache.org/docs/r2.7.1/hadoop-project-dist/hadoop-common/FileSystemShell.html
+
+檔案下載
+http://hadoop.apache.org/releases.html
+
+
+(5) 更改設定檔案的內容
+
+(5.1) namenode (主要的 master 機器)
+# HDFS 的設定檔
+[hadoop@namenode ~]$ cat /home/hadoop/hadoop/etc/hadoop/hdfs-site.xml 
+<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
+<configuration>
+    <property>
+        <name>dfs.replication</name>
+        <value>3</value>
+    </property>
+	<property>
+		<name>dfs.namenode.data.dir</name>
+		<value>/home/hadoop/namenode</value>
+	</property>
+	<property>
+		<name>dfs.datanode.data.dir</name>
+		<value>/home/hadoop/datanode</value>
+	</property>
+	<property>
+		<name>dfs.permissions</name>
+		<value>true</value>
+	</property>
+	<property>
+		<name>dfs.namenode.acls.enabled</name>
+		<value>true</value>
+  </property>
+</configuration>
+
+# 核心的主機交換資料位址
+[hadoop@namenode ~]$ cat /home/hadoop/hadoop/etc/hadoop/core-site.xml 
+<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
+<configuration>
+    <property>
+        <name>fs.defaultFS</name>
+        <value>hdfs://namenode:9000</value>
+    </property>
+	<property>
+		<name>io.file.buffer.size</name>
+		<value>131072</value>
+	</property>
+</configuration>
+
+# 使用 yarn 管理
+[hadoop@namenode ~]$ cat /home/hadoop/hadoop/etc/hadoop/mapred-site.xml
+<?xml version="1.0"?>
+<?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
+<configuration>
+    <property>
+        <name>mapreduce.framework.name</name>
+        <value>yarn</value>
+    </property>
+</configuration>
+
+# yarn-site 的資源管理員設定
+[hadoop@namenode ~]$ cat /home/hadoop/hadoop/etc/hadoop/yarn-site.xml 
+<?xml version="1.0"?>
+<configuration>
+	<property>
+		<name>yarn.resourcemanager.hostname</name>
+		<value>namenode</value>
+	</property>
+
+	<property>
+		<name>yarn.nodemanager.hostname</name>
+		<value>namenode</value> 
+	</property>
+    <property>
+        <name>yarn.nodemanager.aux-services</name>
+        <value>mapreduce_shuffle</value>
+    </property>
+
+<!-- no check virtual mem-->
+    <property>
+        <name>yarn.nodemanager.pmem-check-enabled</name>
+        <value>false</value>
+    </property>
+
+    <property>
+        <name>yarn.nodemanager.vmem-check-enabled</name>
+        <value>false</value>
+    </property>
+</configuration>
+
+# 設定 slave 主機，啟動後會呼叫別台主機的程式}
+[hadoop@namenode ~]$ cat /home/hadoop/hadoop/etc/hadoop/slaves 
+datanode1
+datanode2
+datanode3
+
+# hadoop 的預設 env 變數，其中這行需要 export JAVA_HOME=/usr/java/latest 否則抓不到變數。
+[hadoop@namenode ~]$ cat /home/hadoop/hadoop/etc/hadoop/hadoop-env.sh 
+# The java implementation to use.
+#export JAVA_HOME=${JAVA_HOME}
+export JAVA_HOME=/usr/java/latest
+
+
+
+(5.2) datanode 資料主機，至少建議三台，每台都要設定。
+# 問題一樣
+[hadoop@namenode ~]$ cat /home/hadoop/hadoop/etc/hadoop/hadoop-env.sh 
+# The java implementation to use.
+#export JAVA_HOME=${JAVA_HOME}
+export JAVA_HOME=/usr/java/latest
+
+# yarn-site 設定
+[hadoop@datanode1 ~]$ cat /home/hadoop/hadoop/etc/hadoop/yarn-site.xml 
+<?xml version="1.0"?>
+<configuration>
+    <property>
+        <name>yarn.nodemanager.aux-services</name>
+        <value>mapreduce_shuffle</value>
+    </property>
+</configuration>
+
+# mapred 由 yarn 管管理
+[hadoop@datanode1 ~]$ cat /home/hadoop/hadoop/etc/hadoop/mapred-site.xml
+<?xml version="1.0"?>
+<?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
+<configuration>
+    <property>
+        <name>mapreduce.framework.name</name>
+        <value>yarn</value>
+    </property>
+</configuration>
+
+# HDFS 設定
+[hadoop@datanode1 ~]$ cat /home/hadoop/hadoop/etc/hadoop/hdfs-site.xml 
+<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
+<configuration>
+    <property>
+        <name>dfs.replication</name>
+        <value>3</value>
+    </property>
+<property>
+  <name>dfs.permissions</name>
+  <value>false</value>
+</property>
+<property>
+  <name>dfs.datanode.data.dir</name>
+  <value>/home/hadoop/datanode</value>
+</property>
+</configuration>
+
+# 核心主機
+[hadoop@datanode1 ~]$ cat /home/hadoop/hadoop/etc/hadoop/core-site.xml 
+<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
+<configuration>
+    <property>
+        <name>fs.defaultFS</name>
+        <value>hdfs://namenode:9000</value>
+    </property>
+</configuration>
+
+# slave 本機設定
+[hadoop@datanode1 ~]$ cat /home/hadoop/hadoop/etc/hadoop/slaves 
+localhost
+
+
+
+
+(5.3) 啟動環境變數
+
+# 修改系統的 .bash_profile 檔案
+[hadoop@namenode ~]$ cat .bash_profile
+# .bash_profile
+
+# Get the aliases and functions
+if [ -f ~/.bashrc ]; then
+	. ~/.bashrc
+fi
+
+# User specific environment and startup programs
+
+PATH=$PATH:$HOME/.local/bin:$HOME/bin
+
+export PATH
+
+# HADOOP
+export HADOOP_PREFIX=/home/hadoop/hadoop
+export HADOOP_HOME=$HADOOP_PREFIX
+export HADOOP_COMMON_HOME=$HADOOP_PREFIX
+export HADOOP_CONF_DIR=$HADOOP_PREFIX/etc/hadoop
+export HADOOP_HDFS_HOME=$HADOOP_PREFIX
+export HADOOP_MAPRED_HOME=$HADOOP_PREFIX
+export HADOOP_YARN_HOME=$HADOOP_PREFIX
+export HADOOP_NAMENODE_OPTS="-XX:+UseParallelGC -Xmx1g"
+
+# mapreduce app
+export HADOOP_CLASSPATH=${JAVA_HOME}/lib/tools.jar
+
+# R-HADOOP
+export HADOOP_CMD=$HADOOP_PREFIX/bin/hadoop
+export HADOOP_STREAMING="$HADOOP_PREFIX/share/hadoop/tools/lib/hadoop-streaming-2.7.1.jar"
+
+# HIVE
+export HIVE_HOME=/home/hadoop/apache-hive
+
+# ANT
+export ANT_LIB=/usr/java/ant/lib
+export ANT_HOME=/usr/java/ant/
+
+# Maven
+export MAVEN_HOME=/usr/java/maven/
+export MAVEN_LIB=/usr/java/maven/lib
+
+#JAVA
+export JAVA_HOME=/usr/java/latest
+export JRE_HOME=/usr/java/latest/jre
+
+# PIG
+export PIG_HOME=/home/hadoop/apache-pig
+export PATH=$PATH:$PIG_HOME/bin:$HIVE_HOME/bin:$HADOOP_PREFIX/sbin:$HADOOP_PREFIX/bin:$JAVA_HOME/bin:$JRE_HOME/bin:$ANT_HOME/bin:$MAVEN_HOME/bin
+export PATH=$PATH:$HADOOP_PREFIX/sbin:$HADOOP_PREFIX/bin:$JAVA_HOME/bin:$JRE_HOME/bin
+
+[hadoop@namenode ~]$ source .bash_profile
+
+
+(6) 格式化 hdfs 檔案系統
+# in namenode 機器上
+rm -rf /home/hadoop/namenode
+mkdir /home/hadoop/namenode
+
+# in remote datanode 1,2,3 機器上
+rm -rf /home/hadoop/datanode
+mkdir /home/hadoop/datanode
+
+# 格式化
+hdfs namenode -format"
+
+
+(7) HDFS and YARN 啟動
+# 啟動 HDFS and YARN
+[hadoop@namenode happ]$ start-all.sh 
+This script is Deprecated. Instead use start-dfs.sh and start-yarn.sh
+Starting namenodes on [namenode]
+namenode: starting namenode, logging to /home/hadoop/hadoop/logs/hadoop-hadoop-namenode-namenode.jangmt.com.out
+datanode1: starting datanode, logging to /home/hadoop/hadoop/logs/hadoop-hadoop-datanode-datanode1.out
+datanode2: starting datanode, logging to /home/hadoop/hadoop/logs/hadoop-hadoop-datanode-datanode2.out
+datanode3: starting datanode, logging to /home/hadoop/hadoop/logs/hadoop-hadoop-datanode-datanode3.out
+Starting secondary namenodes [0.0.0.0]
+0.0.0.0: starting secondarynamenode, logging to /home/hadoop/hadoop/logs/hadoop-hadoop-secondarynamenode-namenode.jangmt.com.out
+starting yarn daemons
+starting resourcemanager, logging to /home/hadoop/hadoop/logs/yarn-hadoop-resourcemanager-namenode.jangmt.com.out
+datanode2: starting nodemanager, logging to /home/hadoop/hadoop/logs/yarn-hadoop-nodemanager-datanode2.out
+datanode3: starting nodemanager, logging to /home/hadoop/hadoop/logs/yarn-hadoop-nodemanager-datanode3.out
+datanode1: starting nodemanager, logging to /home/hadoop/hadoop/logs/yarn-hadoop-nodemanager-datanode1.out
+
+# 也可以關閉
+[hadoop@namenode happ]$ stop-all.sh 
+This script is Deprecated. Instead use stop-dfs.sh and stop-yarn.sh
+Stopping namenodes on [namenode]
+namenode: stopping namenode
+datanode1: stopping datanode
+datanode2: stopping datanode
+datanode3: stopping datanode
+Stopping secondary namenodes [0.0.0.0]
+0.0.0.0: stopping secondarynamenode
+stopping yarn daemons
+stopping resourcemanager
+datanode2: no nodemanager to stop
+datanode1: no nodemanager to stop
+datanode3: no nodemanager to stop
+no proxyserver to stop
+
+(8) 觀看 HDFS 驗證
+[hadoop@namenode happ]$ hdfs dfs -mkdir /home
+
+[hadoop@namenode happ]$ hdfs dfs -ls /
+Found 1 items
+drwxr-xr-x   - hadoop supergroup          0 2015-09-28 00:18 /home
+
+[hadoop@namenode happ]$ hdfs dfs -ls /
+Found 1 items
+drwxr-xr-x   - hadoop supergroup          0 2015-09-28 00:18 /home
+
+
+(9) 使用 dfsadmin 觀看報表
+[hadoop@namenode happ]$ hdfs dfsadmin -report
+Configured Capacity: 932499226624 (868.46 GB)
+Present Capacity: 923198201856 (859.80 GB)
+DFS Remaining: 923198177280 (859.80 GB)
+DFS Used: 24576 (24 KB)
+DFS Used%: 0.00%
+Under replicated blocks: 0
+Blocks with corrupt replicas: 0
+Missing blocks: 0
+Missing blocks (with replication factor 1): 0
+
+-------------------------------------------------
+Live datanodes (3):
+
+Name: 192.168.1.1:50010 (datanode1.jangmt.com)
+Hostname: datanode1.jangmt.com
+Decommission Status : Normal
+Configured Capacity: 227524214784 (211.90 GB)
+DFS Used: 8192 (8 KB)
+Non DFS Used: 3100733440 (2.89 GB)
+DFS Remaining: 224423473152 (209.01 GB)
+DFS Used%: 0.00%
+DFS Remaining%: 98.64%
+Configured Cache Capacity: 0 (0 B)
+Cache Used: 0 (0 B)
+Cache Remaining: 0 (0 B)
+Cache Used%: 100.00%
+Cache Remaining%: 0.00%
+Xceivers: 1
+Last contact: Mon Sep 28 00:45:55 CST 2015
+
+
+Name: 192.168.1.2:50010 (datanode2.jangmt.com)
+Hostname: datanode2.jangmt.com
+Decommission Status : Normal
+Configured Capacity: 227524214784 (211.90 GB)
+DFS Used: 8192 (8 KB)
+Non DFS Used: 3100037120 (2.89 GB)
+DFS Remaining: 224424169472 (209.01 GB)
+DFS Used%: 0.00%
+DFS Remaining%: 98.64%
+Configured Cache Capacity: 0 (0 B)
+Cache Used: 0 (0 B)
+Cache Remaining: 0 (0 B)
+Cache Used%: 100.00%
+Cache Remaining%: 0.00%
+Xceivers: 1
+Last contact: Mon Sep 28 00:45:55 CST 2015
+
+
+Name: 192.168.1.3:50010 (datanode3.jangmt.com)
+Hostname: datanode3.jangmt.com
+Decommission Status : Normal
+Configured Capacity: 477450797056 (444.66 GB)
+DFS Used: 8192 (8 KB)
+Non DFS Used: 3100254208 (2.89 GB)
+DFS Remaining: 474350534656 (441.77 GB)
+DFS Used%: 0.00%
+DFS Remaining%: 99.35%
+Configured Cache Capacity: 0 (0 B)
+Cache Used: 0 (0 B)
+Cache Remaining: 0 (0 B)
+Cache Used%: 100.00%
+Cache Remaining%: 0.00%
+Xceivers: 1
+Last contact: Mon Sep 28 00:45:55 CST 2015
+
+(10) 你可以用 jps 看服務有哪些在跑
+[hadoop@namenode happ]$ pdsh_cmd jps
+datanode2: 325 Jps
+datanode1: 7063 Jps
+datanode3: 15576 Jps
+datanode2: 32555 DataNode
+datanode1: 6825 DataNode
+datanode2: 32667 NodeManager
+datanode3: 15338 DataNode
+datanode1: 6937 NodeManager
+datanode3: 15451 NodeManager
+namenode2: 10490 Jps
+[hadoop@namenode happ]$ jps
+19301 SecondaryNameNode
+19959 Jps
+19500 ResourceManager
+19055 NameNode
+
+(11) HDFS 圖形界面
+
+以上是簡易的設定過程。
+
+圖文詳見：
+http://blog.jangmt.com/2015/09/apache-hadoop-cluster-centos.html
