@@ -1,2 +1,3 @@
 # hadoop
-hadoop 相關
+/etc hadoop 的設定檔
+
