@@ -5,11 +5,13 @@ if [ -f ~/.bashrc ]; then
 	. ~/.bashrc
 fi
 
+
 # User specific environment and startup programs
 
 PATH=$PATH:$HOME/.local/bin:$HOME/bin
 
 export PATH
+
 
 # HADOOP
 export HADOOP_PREFIX=/home/hadoop/hadoop
@@ -20,6 +22,10 @@ export HADOOP_HDFS_HOME=$HADOOP_PREFIX
 export HADOOP_MAPRED_HOME=$HADOOP_PREFIX
 export HADOOP_YARN_HOME=$HADOOP_PREFIX
 export HADOOP_NAMENODE_OPTS="-XX:+UseParallelGC -Xmx1g"
+
+export YARN_HOME=$HADOOP_HOME
+#export HADOOP_COMMON_LIB_NATIVE_DIR=$HADOOP_HOME/lib/native
+#export HADOOP_OPTS="-Djava.library.path=$HADOOP_HOME/lib"
 
 # mapreduce app
 export HADOOP_CLASSPATH=${JAVA_HOME}/lib/tools.jar
@@ -45,5 +51,7 @@ export JRE_HOME=/usr/java/latest/jre
 
 # PIG
 export PIG_HOME=/home/hadoop/apache-pig
+
 export PATH=$PATH:$PIG_HOME/bin:$HIVE_HOME/bin:$HADOOP_PREFIX/sbin:$HADOOP_PREFIX/bin:$JAVA_HOME/bin:$JRE_HOME/bin:$ANT_HOME/bin:$MAVEN_HOME/bin
+
 export PATH=$PATH:$HADOOP_PREFIX/sbin:$HADOOP_PREFIX/bin:$JAVA_HOME/bin:$JRE_HOME/bin
