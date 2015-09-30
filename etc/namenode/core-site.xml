@@ -1,5 +1,4 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
+<?xml version="1.0"?>
 <!--
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -13,17 +12,56 @@
   See the License for the specific language governing permissions and
   limitations under the License. See accompanying LICENSE file.
 -->
-
-<!-- Put site-specific property overrides in this file. -->
-
 <configuration>
+
+<!-- Site specific YARN configuration properties -->
+<!--
+<property>
+  <name>yarn.resourcemanager.hostname</name>
+  <value>hnamenode</value>
+</property>
+
+<property>
+  <name>yarn.nodemanager.hostname</name>
+  <value>hnamenode</value> 
+</property>
+-->
+
+<property>
+  <name>yarn.nodemanager.aux-services</name>
+  <value>mapreduce_shuffle</value>
+</property>
+
+<property>
+  <name>yarn.nodemanager.aux-services.mapreduce.shuffle.class</name>
+  <value>org.apache.hadoop.mapred.ShuffleHandler</value>
+</property>
+
+
+<!-- add by mtchang -->
+<property>
+  <name>yarn.resourcemanager.resource-tracker.address</name>
+  <value>hnamenode:8025</value>
+</property>
+<property>
+  <name>yarn.resourcemanager.scheduler.address</name>
+  <value>hnamenode:8030</value>
+</property>
+<property>
+  <name>yarn.resourcemanager.address</name>
+  <value>hnamenode:8050</value>
+</property>
+
+<!-- no check virtual mem-->
     <property>
-        <name>fs.defaultFS</name>
-        <value>hdfs://hnamenode:9000</value>
+        <name>yarn.nodemanager.pmem-check-enabled</name>
+        <value>false</value>
     </property>
+
     <property>
-        <name>io.file.buffer.size</name>
-        <value>131072</value>
+        <name>yarn.nodemanager.vmem-check-enabled</name>
+        <value>false</value>
     </property>
+
 
 </configuration>
