@@ -1,0 +1,279 @@
+
+R in HADOOP - install
+----------------
+------
+Step 0 : 先把 hadoop 的系統環境變數確認，可以用 env 看到底下設定的環境變數
+------
+# 底下為我設定的範例，請以你的 hadoop env 路徑修改
+[root@hdatanode17 ~]# cat .bash_profile 
+# .bash_profile
+
+# Get the aliases and functions
+if [ -f ~/.bashrc ]; then
+	. ~/.bashrc
+fi
+
+
+# User specific environment and startup programs
+
+PATH=$PATH:$HOME/.local/bin:$HOME/bin
+
+export PATH
+
+# ----------------------------------------------
+# HADOOP ENV
+# ----------------------------------------------
+#JAVA
+export JAVA_HOME=/usr/java/latest
+export JRE_HOME=/usr/java/latest/jre
+
+# HADOOP
+export HADOOP_PREFIX=/home/hadoop/hadoop
+export HADOOP_HOME=$HADOOP_PREFIX
+export HADOOP_COMMON_HOME=$HADOOP_PREFIX
+export HADOOP_CONF_DIR=$HADOOP_PREFIX/etc/hadoop
+export HADOOP_HDFS_HOME=$HADOOP_PREFIX
+export HADOOP_MAPRED_HOME=$HADOOP_PREFIX
+export HADOOP_YARN_HOME=$HADOOP_PREFIX
+export HADOOP_NAMENODE_OPTS="-XX:+UseParallelGC -Xmx1g"
+
+export YARN_HOME=$HADOOP_HOME
+#export HADOOP_COMMON_LIB_NATIVE_DIR=$HADOOP_HOME/lib/native
+#export HADOOP_OPTS="-Djava.library.path=$HADOOP_HOME/lib"
+
+# mapreduce app
+export HADOOP_CLASSPATH=${JAVA_HOME}/lib/tools.jar
+
+# R-HADOOP
+export HADOOP_CMD=$HADOOP_PREFIX/bin/hadoop
+export HADOOP_STREAMING="$HADOOP_PREFIX/share/hadoop/tools/lib/hadoop-streaming-2.7.1.jar"
+
+# HIVE
+export HIVE_HOME=/home/hadoop/apache-hive
+
+# ANT
+export ANT_LIB=/usr/java/ant/lib
+export ANT_HOME=/usr/java/ant/
+
+# Maven
+export MAVEN_HOME=/usr/java/maven/
+export MAVEN_LIB=/usr/java/maven/lib
+
+# PIG
+export PIG_HOME=/home/hadoop/apache-pig
+
+# SCALA
+export SCALA_HOME=/usr/local/scala/scala-2.11.7
+
+# SPARK
+export SPARK_HOME=/home/hadoop/apache-spark/
+
+# APP ENV
+export PATH=$PATH:$PIG_HOME/bin:$HIVE_HOME/bin:$HADOOP_PREFIX/sbin:$HADOOP_PREFIX/bin:$ANT_HOME/bin:$MAVEN_HOME/bin:$SCALA_HOME/bin:$SPARK_HOME/bin
+
+# JAVA ENV
+export PATH=$PATH:$HADOOP_PREFIX/sbin:$HADOOP_PREFIX/bin:$JAVA_HOME/bin:$JRE_HOME/bin
+
+# 重新 load .bash_profile  設定檔，讓目前的環境變數可以動作生效
+[root@hdatanode17 ~]# source .bash_profile 
+# env 指令可以驗證
+[root@hdatanode17 ~]# env
+
+------
+Step 1 :先執行做 R javareconf 確定預設的 javareconf 路徑是正確的才進行後續的安裝，不對的話請修正 java 路徑
+------
+[root@hdatanode17 ~]# echo $JAVA_HOME
+/usr/java/latest
+
+[root@hdatanode17 dl]# java -version
+java version "1.8.0_51"
+Java(TM) SE Runtime Environment (build 1.8.0_51-b16)
+Java HotSpot(TM) 64-Bit Server VM (build 25.51-b03, mixed mode)
+
+[root@hdatanode17 ~]#  R CMD javareconf
+Java interpreter : /usr/java/latest/jre/bin/java
+Java version     : 1.8.0_51
+Java home path   : /usr/java/latest
+Java compiler    : /usr/java/latest/bin/javac
+Java headers gen.: /usr/java/latest/bin/javah
+Java archive tool: /usr/java/latest/bin/jar
+Java archive tool: /usr/java/latest/bin/jar
+
+trying to compile and link a JNI program 
+detected JNI cpp flags    : -I$(JAVA_HOME)/include -I$(JAVA_HOME)/include/linux
+detected JNI linker flags : -L$(JAVA_HOME)/jre/lib/amd64/server -ljvm
+gcc -m64 -std=gnu99 -I/usr/include/R -DNDEBUG -I/usr/java/latest/include -I/usr/java/latest/include/linux -I/usr/local/include    -fpic  -O2 -g -pipe -Wall -Wp,-D_FORTIFY_SOURCE=2 -fexceptions -fstack-protector-strong --param=ssp-buffer-size=4 -grecord-gcc-switches   -m64 -mtune=generic  -c conftest.c -o conftest.o
+gcc -m64 -std=gnu99 -shared -L/usr/lib64/R/lib -Wl,-z,relro -o conftest.so conftest.o -L/usr/java/latest/jre/lib/amd64/server -ljvm -L/usr/lib64/R/lib -lR
+
+
+JAVA_HOME        : /usr/java/latest
+Java library path: $(JAVA_HOME)/jre/lib/amd64/server
+JNI cpp flags    : -I$(JAVA_HOME)/include -I$(JAVA_HOME)/include/linux
+JNI linker flags : -L$(JAVA_HOME)/jre/lib/amd64/server -ljvm
+Updating Java configuration in /usr/lib64/R
+Done.
+
+------
+Step 2 : 安裝更新 R base
+[root@hdatanode17 ~]# yum install R 
+
+------
+Step 3 : 用 Root 進入 R 安裝 rmr2 所需要的libs ，先從 CRAN 抓檔案，沒有的再抓檔案編譯。
+------
+[root@hdatanode17 ~]#  R
+自動化步驟：(底下你可以直接複製貼入 R 內)
+chooseCRANmirror(ind=83);
+install.packages(c("codetools","R","Rcpp","RJSONIO","bitops","digest","functional","stringr","plyr","reshape2","rJava","caTools"));
+
+------
+Step 4: 安裝 rmr2 and rhdfs 套件
+------
+軟體可以到這裡抓： https://github.com/RevolutionAnalytics/RHadoop/wiki
+以 rmr2 (3.3.0) 為例，抓取檔案：
+wget --no-check-certificate https://raw.github.com/RevolutionAnalytics/rmr2/3.3.1/build/rmr2_3.3.1.tar.gz
+命令列安裝：
+R CMD INSTALL rmr2_3.3.1.tar.gz 
+
+以rhdfs (1.0.8) 為例，抓取檔案：
+wget --no-check-certificate  https://raw.github.com/RevolutionAnalytics/rhdfs/master/build/rhdfs_1.0.8.tar.gz
+命令列安裝：
+R CMD INSTALL rhdfs_1.0.8.tar.gz
+
+如果寫批次命令，如下列，可以直接貼到命令列安裝：
+R CMD INSTALL bitops_1.0-6.tar.gz
+R CMD INSTALL caTools_1.17.1.tar.gz
+R CMD INSTALL digest_0.6.8.tar.gz
+R CMD INSTALL functional_0.6.tar.gz
+R CMD INSTALL magrittr_1.5.tar.gz
+R CMD INSTALL plyr_1.8.3.tar.gz
+R CMD INSTALL Rcpp_0.12.0.tar.gz
+R CMD INSTALL reshape2_1.4.1.tar.gz
+R CMD INSTALL rJava_0.9-7.tar.gz
+R CMD INSTALL RJSONIO_1.3-0.tar.gz
+R CMD INSTALL stringi_0.5-5.tar.gz
+R CMD INSTALL stringr_1.0.0.tar.gz
+R CMD INSTALL rhdfs_1.0.8.tar.gz
+R CMD INSTALL rmr2_3.3.1.tar.gz
+
+------
+Step 5 ：驗證安裝是否正確， rmr2 and rhdfs 是否可以工作?
+------
+$ R install check
+Sys.getenv()
+Sys.setenv(HADOOP_CMD="/home/hadoop/hadoop/bin/hadoop")
+Sys.setenv(JAVA_HOME="/usr/java/latest")
+Sys.setenv(HADOOP_STREAMING="/home/hadoop/hadoop/share/hadoop/tools/lib/hadoop-streaming-2.7.1.jar")
+library(rhdfs)
+library(rmr2)
+hdfs.init()
+hdfs.ls("/")
+q()
+
+執行的過程大概是這樣結果，主要看 rmr2 及 rhdfs 的 lib load 過程：
+[root@hdatanode20 R]# R
+
+..略 ...
+
+> Sys.setenv(HADOOP_CMD="/home/hadoop/hadoop/bin/hadoop")
+> Sys.setenv(JAVA_HOME="/usr/java/latest")
+> Sys.setenv(HADOOP_STREAMING="/home/hadoop/hadoop/share/hadoop/tools/lib/hadoop-streaming-2.7.1.jar")
+> library(rhdfs)
+Loading required package: rJava
+
+HADOOP_CMD=/home/hadoop/hadoop/bin/hadoop
+
+Be sure to run hdfs.init()
+> library(rmr2)
+Please review your hadoop settings. See help(hadoop.settings)
+Warning message:
+S3 methods ‘gorder.default’, ‘gorder.factor’, ‘gorder.data.frame’, ‘gorder.matrix’, ‘gorder.raw’ were declared in NAMESPACE but not found 
+> hdfs.init()
+15/10/11 00:46:34 WARN util.NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+> hdfs.ls("/")
+  permission  owner      group size          modtime    file
+1 drwxr-xr-x hadoop supergroup    0 2015-10-01 11:10   /home
+2 drwxr-xr-x hadoop supergroup    0 2015-09-29 14:03 /public
+3 drwxrwxrwx hadoop supergroup    0 2015-10-02 12:57    /tmp
+4 drwxr-xr-x hadoop supergroup    0 2015-10-01 14:10   /user
+> q()
+Save workspace image? [y/n/c]: n
+[root@hdatanode20 R]# 
+
+
+REF: 
+https://bigdatastudy.hackpad.com/ep/pad/static/IADMBeqF0vV
+https://github.com/RevolutionAnalytics/RHadoop/wiki
+
+-----------------------------------
+install OK
+-----------------------------------
+
+
+----
+以上可以寫成批次檔案執行：
+----
+
+1.建立檔案： install_pack.R 
+[root@hdatanode19 R]# cat install_pack.R
+chooseCRANmirror(ind=83);
+# install.packages(c("codetools","R","Rcpp","RJSONIO","bitops","digest","functional","stringr","plyr","reshape2","rJava","caTools"));
+install.packages(c("arules"));
+
+2.建立檔案： install_check.R
+[root@hdatanode19 R]# cat install_check.R
+Sys.getenv()
+Sys.setenv(HADOOP_CMD="/home/hadoop/hadoop/bin/hadoop")
+Sys.setenv(JAVA_HOME="/usr/java/latest")
+Sys.setenv(HADOOP_STREAMING="/home/hadoop/hadoop/share/hadoop/tools/lib/hadoop-streaming-2.7.1.jar")
+library(rhdfs)
+library(rmr2)
+hdfs.init()
+hdfs.ls("/")
+
+3.建立檔案： install_lib.sh
+[root@hdatanode19 R]# cat install_lib.sh 
+#/bin/bash
+P='/root/dl/R/'
+R CMD javareconf
+R CMD BATCH ${P}install_pack.R
+R CMD INSTALL ${P}bitops_1.0-6.tar.gz
+R CMD INSTALL ${P}caTools_1.17.1.tar.gz
+R CMD INSTALL ${P}digest_0.6.8.tar.gz
+R CMD INSTALL ${P}functional_0.6.tar.gz
+R CMD INSTALL ${P}magrittr_1.5.tar.gz
+R CMD INSTALL ${P}plyr_1.8.3.tar.gz
+R CMD INSTALL ${P}Rcpp_0.12.0.tar.gz
+R CMD INSTALL ${P}reshape2_1.4.1.tar.gz
+R CMD INSTALL ${P}rJava_0.9-7.tar.gz
+R CMD INSTALL ${P}RJSONIO_1.3-0.tar.gz
+R CMD INSTALL ${P}stringi_0.5-5.tar.gz
+R CMD INSTALL ${P}stringr_1.0.0.tar.gz
+R CMD INSTALL ${P}rhdfs_1.0.8.tar.gz
+R CMD INSTALL ${P}rmr2_3.3.1.tar.gz
+R CMD javareconf
+R CMD BATCH ${P}install_check.R 
+
+4. 把會用到的檔案都先抓下來
+[root@hdatanode19 R]# ls -la *.tar.gz
+-rw-r--r--. 1 hadoop hadoop    8734 Sep 10 21:10 bitops_1.0-6.tar.gz
+-rw-r--r--. 1 hadoop hadoop   63358 Sep 10 21:10 caTools_1.17.1.tar.gz
+-rw-r--r--. 1 root   root     36464 Jun 25 00:01 chron_2.3-47.tar.gz
+-rw-rw-r--. 1 hadoop hadoop  949746 Oct  2  2014 data.table_1.9.4.tar.gz
+-rw-r--r--. 1 hadoop hadoop   97985 Sep 10 21:10 digest_0.6.8.tar.gz
+-rw-r--r--. 1 hadoop hadoop    2794 Sep 10 21:10 functional_0.6.tar.gz
+-rw-r--r--. 1 hadoop hadoop  200504 Sep 10 21:10 magrittr_1.5.tar.gz
+-rw-r--r--. 1 hadoop hadoop  392337 Sep 10 21:10 plyr_1.8.3.tar.gz
+-rw-r--r--. 1 hadoop hadoop 2297548 Sep 10 21:10 Rcpp_0.12.0.tar.gz
+-rw-r--r--. 1 hadoop hadoop   34693 Sep 10 21:10 reshape2_1.4.1.tar.gz
+-rw-rw-r--. 1 hadoop hadoop   25105 Sep  7 22:48 rhdfs_1.0.8.tar.gz
+-rw-r--r--. 1 hadoop hadoop  711181 Sep 10 21:10 rJava_0.9-7.tar.gz
+-rw-r--r--. 1 hadoop hadoop 1148375 Sep 10 21:10 RJSONIO_1.3-0.tar.gz
+-rw-rw-r--. 1 hadoop hadoop   63137 Sep  7 22:49 rmr2_3.3.1.tar.gz
+-rw-rw-r--. 1 hadoop hadoop   29205 Nov  7  2014 sqldf_0.4-10.tar.gz
+-rw-r--r--. 1 hadoop hadoop 3639183 Sep 10 21:10 stringi_0.5-5.tar.gz
+-rw-r--r--. 1 hadoop hadoop   34880 Sep 10 21:10 stringr_1.0.0.tar.gz
+
+5.命令列批次執行, Rout 附檔名為執行後的結果
+[root@hdatanode19 R]#./install_lib.sh
+cat install_pack.Rout
+cat install_check.Rout
