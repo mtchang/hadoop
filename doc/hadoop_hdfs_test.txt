@@ -1,0 +1,67 @@
+
+因為不太清楚 Hadoop HDFS 在傳輸檔案的速度，所以寫了一個小程式來測試 HDFS 上傳檔案的速度。
+
+先講結論：hdfs 大概會花3秒的時間做協調的傳輸工作，所以大約 1MB 左右的時間都是 3 秒。傳輸的檔案越大，速度越快。
+
+結果整理如下：
+
+容量      傳輸時間  平均每小速度(MBytes)
+110K		3		36KB/S
+1.1MB		3		375KB/S
+10.7MB		4		2739.2KB/S --> 2.675MB
+107.1MB		9		11.9MB/S
+1.0GB		23		44.521MB/S
+11GB		216		52.148MB/S
+
+過程及程式測試 shell script
+[hadoop@hnamenode input]$ cat run_put.sh 
+#!/bin/bash
+ARGC1='input.txt'
+ARGC1=$1
+if [ "ARGC1" != "" ]; then
+	PROG_START=$(date +%s)
+	hdfs dfs -put ${ARGC1} /public/data/
+	PROG_END=$(date +%s)
+	PROG_DURING=$(expr $PROG_END - $PROG_START)
+	echo "上傳 ${ARGC1} 檔案到 HDFS:/public/data/ 目錄下"
+	echo "花費時間： ${PROG_DURING} 秒"
+	hdfs dfs -ls -h /public/data/${ARGC1}
+fi
+
+[hadoop@hnamenode input]$ ls -alh
+total 12G
+drwxrwxr-x. 2 hadoop hadoop 4.0K Oct 17 13:23 .
+drwxrwxr-x. 4 hadoop hadoop 4.0K Oct  4 00:26 ..
+-rw-rw-r--. 1 hadoop hadoop  11G Oct  1 22:33 input100K.txt
+-rw-rw-r--. 1 hadoop hadoop  11M Oct  1 22:31 input100.txt
+-rw-rw-r--. 1 hadoop hadoop 1.1G Oct  1 22:32 input10K.txt
+-rw-rw-r--. 1 hadoop hadoop 1.1M Oct  1 22:30 input10.txt
+-rw-rw-r--. 1 hadoop hadoop 108M Oct  1 22:31 input1K.txt
+-rw-r--r--. 1 hadoop hadoop 110K Oct  1 22:18 input.txt
+-rwxrwxr-x. 1 hadoop hadoop  343 Oct 17 13:23 run_put.sh
+
+[hadoop@hnamenode input]$ ./run_put.sh input.txt
+上傳 input.txt 檔案到 HDFS:/public/data/ 目錄下
+花費時間： 3 秒
+-rw-r--r--   3 hadoop supergroup    109.7 K 2015-10-17 13:32 /public/data/input.txt
+[hadoop@hnamenode input]$ ./run_put.sh input10.txt
+上傳 input10.txt 檔案到 HDFS:/public/data/ 目錄下
+花費時間： 3 秒
+-rw-r--r--   3 hadoop supergroup      1.1 M 2015-10-17 13:24 /public/data/input10.txt
+[hadoop@hnamenode input]$ ./run_put.sh input100.txt
+上傳 input100.txt 檔案到 HDFS:/public/data/ 目錄下
+花費時間： 4 秒
+-rw-r--r--   3 hadoop supergroup     10.7 M 2015-10-17 13:25 /public/data/input100.txt
+[hadoop@hnamenode input]$ ./run_put.sh input1K.txt
+上傳 input1K.txt 檔案到 HDFS:/public/data/ 目錄下
+花費時間： 9 秒
+-rw-r--r--   3 hadoop supergroup    107.1 M 2015-10-17 13:25 /public/data/input1K.txt
+[hadoop@hnamenode input]$ ./run_put.sh input10K.txt
+上傳 input10K.txt 檔案到 HDFS:/public/data/ 目錄下
+花費時間： 23 秒
+-rw-r--r--   3 hadoop supergroup      1.0 G 2015-10-17 13:26 /public/data/input10K.txt
+[hadoop@hnamenode input]$ ./run_put.sh input100K.txt
+上傳 input100K.txt 檔案到 HDFS:/public/data/ 目錄下
+花費時間： 216 秒
+-rw-r--r--   3 hadoop supergroup      10.5 G 2015-10-17 13:31 /public/data/input100K.txt
+
